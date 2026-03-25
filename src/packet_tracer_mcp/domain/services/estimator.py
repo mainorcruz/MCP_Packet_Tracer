@@ -12,14 +12,19 @@ from ..models.plans import TopologyPlan
 
 def estimate_from_request(request: TopologyRequest) -> dict:
     """Estima recursos sin generar el plan completo."""
-    pcs = request.pcs_per_lan
-    if isinstance(pcs, int):
-        total_pcs = pcs * request.routers
-    else:
-        total_pcs = sum(pcs[:request.routers])
+    total_pcs = _normalized_total(request.pcs_per_lan, request.routers)
+    total_laptops = _normalized_total(request.laptops_per_lan, request.routers)
+    total_access_points = min(request.access_points, request.routers)
 
     total_switches = request.routers * request.switches_per_router
-    total_devices = request.routers + total_switches + total_pcs + request.servers
+    total_devices = (
+        request.routers
+        + total_switches
+        + total_pcs
+        + total_laptops
+        + total_access_points
+        + request.servers
+    )
     if request.has_wan:
         total_devices += 1
 
@@ -27,15 +32,27 @@ def estimate_from_request(request: TopologyRequest) -> dict:
     router_links = max(0, request.routers - 1)  # cadena
     router_switch_links = total_switches
     switch_pc_links = total_pcs
+    switch_laptop_links = total_laptops
+    switch_ap_links = total_access_points
     server_links = request.servers
     wan_link = 1 if request.has_wan else 0
-    total_links = router_links + router_switch_links + switch_pc_links + server_links + wan_link
+    total_links = (
+        router_links
+        + router_switch_links
+        + switch_pc_links
+        + switch_laptop_links
+        + switch_ap_links
+        + server_links
+        + wan_link
+    )
 
     return {
         "devices": {
             "routers": request.routers,
             "switches": total_switches,
             "pcs": total_pcs,
+            "laptops": total_laptops,
+            "access_points": total_access_points,
             "servers": request.servers,
             "clouds": 1 if request.has_wan else 0,
             "total": total_devices,
@@ -44,6 +61,8 @@ def estimate_from_request(request: TopologyRequest) -> dict:
             "router_to_router": router_links,
             "router_to_switch": router_switch_links,
             "switch_to_pc": switch_pc_links,
+            "switch_to_laptop": switch_laptop_links,
+            "switch_to_access_point": switch_ap_links,
             "switch_to_server": server_links,
             "router_to_cloud": wan_link,
             "total": total_links,
@@ -85,7 +104,9 @@ def estimate_from_plan(plan: TopologyPlan) -> dict:
 def _estimate_complexity(req: TopologyRequest) -> str:
     score = req.routers * 3 + (
         (sum(req.pcs_per_lan) if isinstance(req.pcs_per_lan, list) else req.pcs_per_lan * req.routers)
-    ) + req.servers * 2
+    ) + (
+        (sum(req.laptops_per_lan) if isinstance(req.laptops_per_lan, list) else req.laptops_per_lan * req.routers)
+    ) + req.servers * 2 + min(req.access_points, req.routers)
     if req.has_wan:
         score += 5
     if req.routing.value == "ospf":
@@ -102,3 +123,14 @@ def _estimate_complexity(req: TopologyRequest) -> str:
     elif score <= 50:
         return "compleja"
     return "muy compleja"
+
+
+def _normalized_total(values: int | list[int], routers: int) -> int:
+    """Normaliza un entero/lista por router usando la misma convención del orquestador."""
+    if isinstance(values, int):
+        return values * routers
+
+    normalized = list(values[:routers])
+    while len(normalized) < routers:
+        normalized.append(normalized[-1] if normalized else 0)
+    return sum(normalized)

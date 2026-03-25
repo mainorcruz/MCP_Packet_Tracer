@@ -6,6 +6,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a **Packet Tracer MCP Server** — a Model Context Protocol server that enables LLMs to create, configure, validate, and **deploy in real-time** network topologies to Cisco Packet Tracer. The server provides 22 MCP tools and 5 MCP resources, including live deployment via HTTP bridge.
 
+Current maintenance values for this repo:
+- Preserve flows that already work before attempting feature expansion.
+- Prefer contract fixes, docs alignment, and regression coverage over broad rewrites.
+- Keep public tool behavior stable unless the current contract is objectively broken.
+- Treat templates as partially implemented unless code proves unique behavior.
+
 **Tech Stack:** Python 3.11+, Pydantic 2.0+, MCP (fastmcp), Streamable HTTP
 **Transport:** `http://127.0.0.1:39000/mcp` (streamable-http) | `--stdio` para legacy
 **Version:** 0.4.0
@@ -15,10 +21,10 @@ This is a **Packet Tracer MCP Server** — a Model Context Protocol server that 
 ### Run the MCP Server
 ```bash
 # Streamable HTTP en :39000 (default)
-python -m src.packet_tracer_mcp
+python -m packet_tracer_mcp
 
 # Modo stdio (debug/legacy)
-python -m src.packet_tracer_mcp --stdio
+python -m packet_tracer_mcp --stdio
 ```
 
 ### Install/Reinstall
@@ -154,14 +160,21 @@ Bootstrap script (paste in PT Builder Code Editor and click Run):
 
 ## Testing
 
-Tests are in `tests/`. Currently 34 tests covering IP planning, validation, auto-fixing, explanation, estimation, generation, and full build integration.
+Tests are in `tests/`. Prioritize regression coverage for the real contracts: planning, validation, generation, export, and bridge-safe execution. Prefer adding tests before touching orchestration behavior.
 
 ## Supported Routing
 
 - **static**: Complete (generates `ip route` commands)
 - **ospf**: Complete (generates `router ospf` configs)
-- **eigrp/rip**: Enum only, not implemented
+- **eigrp**: Implemented in planning and config generation
+- **rip**: Implemented in planning and config generation
 - **none**: No routing
+
+## Tool Contract Notes
+
+- `pt_plan_topology` is the canonical machine-readable JSON source for downstream tools.
+- `pt_full_build` is presentation-oriented output and should not be treated as direct JSON input.
+- Template metadata is present in the catalog, but orchestration still follows a mostly shared topology-building path.
 
 ## IP Addressing
 

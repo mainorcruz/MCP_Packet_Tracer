@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [project.scripts]
-pt-mcp = "src.packet_tracer_mcp.server:main"
+pt-mcp = "packet_tracer_mcp.server:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/packet_tracer_mcp"]

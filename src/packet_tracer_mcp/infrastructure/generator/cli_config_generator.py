@@ -122,7 +122,7 @@ def _switch_config(switch: DevicePlan, plan: TopologyPlan) -> str:
     return "\n".join(lines)
 
 
-def generate_pc_config(device: DevicePlan) -> str:
+def generate_pc_config(device: DevicePlan, use_dhcp: bool | None = None) -> str:
     """Genera instrucciones de configuración para un PC."""
     lines: list[str] = []
     lines.append(f"--- {device.name} ---")
@@ -136,5 +136,8 @@ def generate_pc_config(device: DevicePlan) -> str:
     if device.gateway:
         lines.append(f"Default Gateway: {device.gateway}")
     lines.append("DNS Server: 8.8.8.8")
-    lines.append("Configurar como DHCP para obtener IP automáticamente.")
+    if use_dhcp:
+        lines.append("Configurar como DHCP para obtener IP automáticamente.")
+    else:
+        lines.append("Configurar IP estática con los valores anteriores.")
     return "\n".join(lines)

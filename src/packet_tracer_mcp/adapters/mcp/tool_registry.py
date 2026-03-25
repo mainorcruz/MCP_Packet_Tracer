@@ -8,7 +8,6 @@ from __future__ import annotations
 import json
 import time
 import urllib.request
-import urllib.error
 from mcp.server.fastmcp import FastMCP
 
 from ...domain.models.plans import TopologyPlan
@@ -21,6 +20,7 @@ from ...domain.services.estimator import estimate_from_request, estimate_from_pl
 from ...infrastructure.generator.ptbuilder_generator import (
     generate_ptbuilder_script,
     generate_full_script,
+    generate_executable_script,
 )
 from ...infrastructure.generator.cli_config_generator import (
     generate_all_configs,
@@ -30,7 +30,6 @@ from ...infrastructure.execution.manual_executor import ManualExecutor
 from ...infrastructure.execution.deploy_executor import DeployExecutor
 from ...infrastructure.execution.live_bridge import PTCommandBridge
 from ...infrastructure.execution.live_executor import LiveExecutor
-from ...infrastructure.generator.ptbuilder_generator import generate_executable_script
 from ...infrastructure.persistence.project_repository import ProjectRepository
 from ...infrastructure.catalog.devices import ALL_MODELS
 from ...infrastructure.catalog.cables import CABLE_TYPES
@@ -307,8 +306,9 @@ def register_tools(mcp: FastMCP) -> None:
         pcs = [d for d in plan.devices if d.category in ("pc", "server", "laptop")]
         if pcs:
             result_parts.append("=== Configuración de hosts ===")
+            use_dhcp = bool(plan.dhcp_pools)
             for pc in pcs:
-                result_parts.append(generate_pc_config(pc))
+                result_parts.append(generate_pc_config(pc, use_dhcp=use_dhcp))
                 result_parts.append("")
 
         return "\n".join(result_parts)
@@ -450,8 +450,9 @@ def register_tools(mcp: FastMCP) -> None:
         pcs = [d for d in plan.devices if d.category in ("pc", "server", "laptop")]
         if pcs:
             parts.append(f"\n--- Hosts ---")
+            use_dhcp = bool(plan.dhcp_pools)
             for pc in pcs:
-                parts.append(generate_pc_config(pc))
+                parts.append(generate_pc_config(pc, use_dhcp=use_dhcp))
 
         # --- Validaciones sugeridas ---
         if plan.validations:

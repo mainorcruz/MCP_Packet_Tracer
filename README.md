@@ -11,7 +11,7 @@ Le decís "creame una red con 3 routers, DHCP y OSPF" y el servidor planifica la
 ## Instalación
 
 ```bash
-git clone <repo>
+git clone https://github.com/Mats2208/MCP-Packet-Tracer
 cd PACKET-TRACER
 pip install -e .
 ```
@@ -23,7 +23,7 @@ pip install -e .
 ### 1. Levantar el servidor
 
 ```bash
-python -m src.packet_tracer_mcp
+python -m packet_tracer_mcp
 ```
 
 Esto inicia:
@@ -32,7 +32,7 @@ Esto inicia:
 
 Ambos arrancan automáticamente. No se necesita ningún script adicional.
 
-> Para modo stdio (debug/legacy): `python -m src.packet_tracer_mcp --stdio`
+> Para modo stdio (debug/legacy): `python -m packet_tracer_mcp --stdio`
 
 ### 2. Configurar el cliente MCP
 
@@ -88,6 +88,12 @@ Pedile al LLM que cree una red. El servidor expone 22 tools MCP que cubren todo 
 | `pt_send_raw` | Envía JS arbitrario a PT |
 | `pt_export` | Exporta plan + scripts + configs a archivos |
 | `pt_list_projects` / `pt_load_project` | Gestión de proyectos guardados |
+
+Notas de uso:
+
+- `pt_plan_topology` devuelve el plan como JSON puro. Ese output es el input correcto para `pt_validate_plan`, `pt_fix_plan`, `pt_generate_script`, `pt_generate_configs`, `pt_export`, `pt_deploy` y `pt_live_deploy`.
+- `pt_full_build` devuelve un reporte humano completo para lectura rápida. Incluye el plan JSON al final como referencia, pero no debe tratarse como input JSON directo para otras tools.
+- El catálogo de `template` existe y es útil para guiar al LLM, pero la generación diferenciada por plantilla todavía es parcial. La ruta estable hoy sigue siendo la familia de topologías `multi_lan` con variantes de WAN, DHCP y routing.
 
 ---
 
@@ -176,6 +182,8 @@ src/packet_tracer_mcp/
 
 - **static** — genera `ip route` completas
 - **ospf** — genera `router ospf` con áreas
+- **eigrp** — genera `router eigrp` con redes y wildcard masks
+- **rip** — genera `router rip` v2 con `no auto-summary`
 - **none** — sin routing
 
 ---
@@ -192,20 +200,11 @@ python -m pytest tests/ -v
 
 - Python 3.11+
 - Cisco Packet Tracer 8.2+ (para live deploy)
-- PTBuilder extension instalada en PT (incluida en `PTBuilder/`)
+- PTBuilder extension instalada en PT
 
 5. Listo. El MCP server puede crear dispositivos, enlaces y configurar routers automáticamente.
 
 > **Nota técnica**: El bootstrap inyecta un `setInterval` en el webview que hace polling HTTP. El `$se('runCode', ...)` bridgea del webview al Script Engine de PT. PTBuilder usa `executeCode()` que internamente hace `code.replace(/\n/g, "")`, por eso el bootstrap usa `/* */` comments en vez de `//`.
-
-### Setup permanente (opcional):
-
-Para que el polling arranque automáticamente al abrir Builder Code Editor:
-
-1. En PT: Extensions > Scripting Interface
-2. Seleccioná el módulo Builder
-3. Reemplazá `main.js` e `interface.js` con las versiones modificadas en `PTBuilder/source/`
-4. Guardá y reiniciá el módulo
 
 ---
 
@@ -244,7 +243,7 @@ Para que el polling arranque automáticamente al abrir Builder Code Editor:
 ### Pipeline completo
 | Tool | Descripción |
 |------|------------|
-| `pt_full_build` | Todo en uno: planifica, valida, genera y exporta |
+| `pt_full_build` | Todo en uno: planifica, valida, genera, explica y estima |
 
 ### Despliegue en vivo
 | Tool | Descripción |
@@ -287,12 +286,14 @@ Para que el polling arranque automáticamente al abrir Builder Code Editor:
 ## Dispositivos soportados
 
 ### Routers
-| Modelo | Puertos |
-|--------|---------|
-| 1941 | Gig0/0, Gig0/1, Se0/0/0, Se0/0/1 |
-| 2901 | Gig0/0, Gig0/1, Se0/0/0, Se0/0/1 |
-| 2911 | Gig0/0, Gig0/1, Gig0/2, Se0/0/0, Se0/0/1 |
-| 4321 (ISR4321) | Gig0/0/0, Gig0/0/1 |
+| Modelo | Puertos GigabitEthernet | Notas |
+|--------|------------------------|-------|
+| 1941 | 2 (Gig0/0, Gig0/1) | |
+| 2901 | 2 (Gig0/0, Gig0/1) | |
+| **2911** | **3 (Gig0/0, Gig0/1, Gig0/2)** | **Default** |
+| ISR4321 | 2 (Gig0/0/0, Gig0/0/1) | |
+
+> **Nota:** Ningún router tiene puertos Serial por defecto. Serial requiere módulos HWIC físicos adicionales.
 
 ### Switches
 | Modelo | Puertos |
@@ -319,11 +320,13 @@ Para que el polling arranque automáticamente al abrir Builder Code Editor:
 
 | Cable | Uso típico |
 |-------|-----------|
-| straight | Switch↔Router, Switch↔PC |
-| cross | Router↔Router, Switch↔Switch, PC↔PC |
-| serial | Router Serial↔Router Serial (WAN) |
-| fiber | Conexiones de fibra óptica |
-| auto | Detección automática |
+| `straight` | Switch ↔ Router, Switch ↔ PC/Server/AP |
+| `cross` | Router ↔ Router, Switch ↔ Switch |
+| `serial` | Router Serial ↔ Router Serial (requiere HWIC) |
+| `fiber` | Conexiones de fibra óptica |
+| `console` | PC/Laptop ↔ Router/Switch (gestión) |
+
+El cable correcto se infiere automáticamente a partir de las categorías de los dispositivos conectados.
 
 ---
 
@@ -337,13 +340,15 @@ Para que el polling arranque automáticamente al abrir Builder Code Editor:
 
 ## Routing soportado
 
-| Protocolo | Estado | Genera |
-|-----------|--------|--------|
-| static | ✅ Completo | `ip route` commands |
-| ospf | ✅ Completo | `router ospf` configs |
-| eigrp | 🔲 Enum only | No implementado |
-| rip | 🔲 Enum only | No implementado |
-| none | ✅ | Sin routing |
+| Protocolo | Genera |
+|-----------|--------|
+| `static` | `ip route {dest} {mask} {next_hop} [AD]` — con BFS para rutas multi-hop |
+| `ospf` | `router ospf`, `router-id`, `network {net} {wildcard} area 0` |
+| `eigrp` | `router eigrp {AS}`, `network {net} {wildcard}`, `no auto-summary` |
+| `rip` | `router rip`, `version 2`, `network {net}`, `no auto-summary` |
+| `none` | Sin configuración de routing |
+
+Floating routes (rutas de respaldo con AD=254) soportado para `static`.
 
 ---
 
@@ -405,43 +410,6 @@ TopologyRequest → Orchestrator → IPPlanner → Validator → AutoFixer
 
 ---
 
-## PTBuilder (extensión de PT)
-
-El directorio `PTBuilder/` contiene el código fuente del Script Module "Builder Code Editor":
-
-| Archivo | Función |
-|---------|---------|
-| `source/main.js` | Entry point — crea menú y webview |
-| `source/runcode.js` | `runCode(scriptText)` — ejecuta JS en Script Engine |
-| `source/userfunctions.js` | `addDevice()`, `addLink()`, `configureIosDevice()`, `configurePcIp()`, `queryTopology()`, `deleteDevice()`, `renameDevice()`, `moveDevice()`, `deleteLink()` |
-| `source/devices.js` | Mapeo modelo → tipo numérico de PT |
-| `source/links.js` | Mapeo tipo de cable → ID numérico |
-| `source/modules.js` | Mapeo módulos de hardware |
-| `source/window.js` | Gestión de la ventana webview (QWebEngine) |
-| `source/interface/` | HTML + JS del editor web (status panel + real-time logging) |
-| `Builder.pts` | Paquete compilado de la extensión (binario, no editable) |
-
-### API principal de PTBuilder
-
-```javascript
-// Crear dispositivo en coordenadas (x, y)
-addDevice("R1", "2911", 100, 200);
-
-// Crear enlace entre dos dispositivos
-addLink("R1", "GigabitEthernet0/1", "S1", "GigabitEthernet0/1", "straight");
-
-// Configurar router/switch con CLI commands
-configureIosDevice("R1", "enable\nconfigure terminal\nhostname R1\ninterface GigabitEthernet0/0\nip address 192.168.0.1 255.255.255.0\nno shutdown\nexit");
-
-// Configurar IP estática de PC
-configurePcIp("PC1", false, "192.168.0.2", "255.255.255.0", "192.168.0.1");
-
-// Configurar PC para DHCP
-configurePcIp("PC1", true);
-```
-
----
-
 ## Tests
 
 ```bash
@@ -455,7 +423,7 @@ python -m pytest tests/test_full_build.py -v
 python -m pytest tests/test_full_build.py::TestFullBuild::test_basic_2_routers -v
 ```
 
-34 tests cubriendo: IP planning, validación, auto-fix, explicación, estimación, generación y full build integration.
+38 tests cubriendo: IP planning, validación, auto-fix, explicación, estimación, generación de scripts, generación de configs y full build integration.
 
 ---
 

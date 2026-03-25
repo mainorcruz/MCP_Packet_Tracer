@@ -1,10 +1,41 @@
-__pycache__/
+# Python cache — matches in ALL subdirectories
+**/__pycache__/
 *.pyc
 *.pyo
+*.pyd
+
+# Tests & coverage
 .pytest_cache/
+.coverage
+htmlcov/
+
+# Build & packaging
 *.egg-info/
 dist/
 build/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# macOS
+.DS_Store
+
+# Packet Tracer native files
+*.pts
+*.pkt
+
+# Generated runtime artifacts
 data/test_*
+tmp/
+
+# Project exports (runtime output, not source)
 projects/
+
+# Tooling
 .claude/
+.vscode/settings.json
+*.log
+
