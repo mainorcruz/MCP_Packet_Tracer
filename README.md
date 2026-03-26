@@ -17,7 +17,10 @@
   <img src="img/Foto2.png" alt="MCP server connected in Claude Code" width="700"/>
 </p>
 <p align="center"><em>MCP server connected in Claude Code — ready to receive tool calls</em></p>
-
+<p align="center">
+  <img src="img/LinuxCapture.png" alt="MCP server connected in Claude Code using Arch Linux" width="700"/>
+</p>
+<p align="center"><em>MCP server connected in Claude Code using Arch Linux — ready to receive tool calls</em></p>
 ---
 
 ## Table of Contents
