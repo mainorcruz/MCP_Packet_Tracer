@@ -17,6 +17,9 @@ def generate_ptbuilder_script(plan: TopologyPlan) -> str:
     for dev in plan.devices:
         lines.append(f'addDevice("{dev.name}", "{dev.model}", {dev.x}, {dev.y});')
 
+    for mod in plan.modules:
+        lines.append(f'addModule("{mod.device}", {mod.slot}, "{mod.module}");')
+
     for link in plan.links:
         lines.append(
             f'addLink("{link.device_a}", "{link.port_a}", '

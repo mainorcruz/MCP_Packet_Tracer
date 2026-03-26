@@ -6,7 +6,7 @@ Esta carpeta es la **fuente de verdad** para qué dispositivos, puertos y cables
 
 ## Archivos
 
-### `devices.py` — Catálogo de dispositivos (11 modelos)
+### `devices.py` — Catálogo de dispositivos (33 modelos)
 
 **Modelos Pydantic:**
 - `PortSpec` — Especificación de puerto: `speed` (PortSpeed), `slot` (int), `full_name` (str completo como "GigabitEthernet0/0")
@@ -16,17 +16,39 @@ Esta carpeta es la **fuente de verdad** para qué dispositivos, puertos y cables
 
 | Modelo | Categoría | Puertos | Notas |
 |--------|-----------|---------|-------|
-| `1941` | Router | 2× GigabitEthernet | Básico |
-| `2901` | Router | 2× GigabitEthernet | |
-| `2911` | Router | 3× GigabitEthernet | **Default** — más puertos |
-| `ISR4321` | Router | 2× GigabitEthernet | Moderno |
-| `2960-24TT` | Switch | 24× FastEthernet + 2× GigabitEthernet | **Default** |
-| `3560-24PS` | Switch | 24× FastEthernet + 2× GigabitEthernet | Layer 3 capable |
-| `PC-PT` | PC | 1× FastEthernet0 | End device |
-| `Server-PT` | Server | 1× FastEthernet0 | End device |
-| `Laptop-PT` | Laptop | 1× FastEthernet0 | End device |
-| `Cloud-PT` | Cloud | 1× Ethernet6 | WAN simulation |
-| `AccessPoint-PT` | AP | 1× Port 0 | Wireless |
+| `1841` | router | 2× FastEthernet | |
+| `1941` | router | 2× GigabitEthernet | |
+| `2811` | router | 2× FastEthernet | |
+| `2901` | router | 2× GigabitEthernet | |
+| `2911` | router | 3× GigabitEthernet | **Default** |
+| `ISR4321` | router | 2× GigabitEthernet (0/0/0, 0/0/1) | |
+| `ISR4331` | router | 3× GigabitEthernet (0/0/0–2) | |
+| `Router-PT` | router | 2× FastEthernet | Genérico |
+| `2950-24` | switch | 24× FastEthernet | L2 básico |
+| `2950T-24` | switch | 24× FastEthernet + 2× GigabitEthernet | |
+| `2960-24TT` | switch | 24× FastEthernet + 2× GigabitEthernet | **Default** |
+| `Switch-PT` | switch | 8× FastEthernet | Genérico |
+| `3560-24PS` | switch | 24× FastEthernet + 2× GigabitEthernet | L3 |
+| `3650-24PS` | switch | 24× FastEthernet + 2× GigabitEthernet | L3 |
+| `PC-PT` | pc | 1× FastEthernet0 | |
+| `Server-PT` | server | 1× FastEthernet0 | |
+| `Laptop-PT` | laptop | 1× FastEthernet0 | |
+| `TabletPC-PT` | pc | 1× FastEthernet0 | |
+| `SMARTPHONE-PT` | pc | 1× FastEthernet0 | |
+| `Printer-PT` | pc | 1× FastEthernet0 | |
+| `Cloud-PT` | cloud | 1× Ethernet6 | WAN simulation |
+| `AccessPoint-PT` | accesspoint | 1× Port 0 | |
+| `AccessPoint-PT-N` | accesspoint | 1× Port 0 | |
+| `AccessPoint-PT-AC` | accesspoint | 1× Port 0 | |
+| `LAP-PT` | accesspoint | 1× Port 0 | Lightweight AP |
+| `Hub-PT` | hub | 8× Port | |
+| `5505` | firewall | 8× FastEthernet | Cisco ASA |
+| `5506-X` | firewall | 8× GigabitEthernet | Cisco ASA |
+| `WLC-PT` | wlc | 8× GigabitEthernet | Wireless controller |
+| `WLC-2504` | wlc | 4× GigabitEthernet | |
+| `WLC-3504` | wlc | 4× GigabitEthernet | |
+| `DSL-Modem-PT` | modem | Ethernet0 + Coaxial0 | |
+| `Cable-Modem-PT` | modem | Ethernet0 + Coaxial0 | |
 
 > **Nota:** Ningún router tiene puertos Serial por defecto. Serial requiere módulos HWIC físicos.
 
@@ -37,7 +59,7 @@ Esta carpeta es la **fuente de verdad** para qué dispositivos, puertos y cables
 | `get_ports_by_speed(model, speed)` | `DeviceModel, PortSpeed → list[PortSpec]` | Filtra puertos por velocidad |
 | `get_valid_ports(model_name)` | `str → set[str]` | Set de nombres completos de puertos válidos |
 
-**Constante:** `DEVICE_CATALOG: dict[str, DeviceModel]` — Diccionario nombre → modelo.
+**Constante:** `ALL_MODELS: dict[str, DeviceModel]` — Diccionario pt_type → modelo.
 
 ---
 
@@ -45,7 +67,7 @@ Esta carpeta es la **fuente de verdad** para qué dispositivos, puertos y cables
 
 **Constantes:**
 - `CABLE_TYPES` — 5 tipos: `straight`, `cross`, `serial`, `fiber`, `console`
-- `CABLE_RULES` — 20+ reglas como tuplas `(category_a, category_b) → cable_type`
+- `CABLE_RULES` — 50+ reglas como tuplas `(category_a, category_b) → cable_type`
 
 **Reglas principales:**
 | Combinación | Cable |

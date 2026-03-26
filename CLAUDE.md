@@ -116,7 +116,7 @@ Python HTTP bridge (`live_bridge.py`) on `127.0.0.1:54321` ↔ PTBuilder QWebEng
 
 ### Device Catalog
 
-Located in `infrastructure/catalog/`. Contains 11 device models (routers: 1941, 2901, 2911, ISR4321; switches: 2960-24TT, 3560-24PS; PC-PT, Server-PT, Laptop-PT, Cloud-PT, AccessPoint-PT) with verified port definitions. **No router has serial ports by default** — serial requires HWIC modules.
+Located in `infrastructure/catalog/`. Contains 33 device models across 11 categories: routers (1841, 1941, 2811, 2901, 2911, ISR4321, ISR4331, Router-PT), switches L2 (2950-24, 2950T-24, 2960-24TT, Switch-PT), switches L3 (3560-24PS, 3650-24PS), end devices (PC-PT, Server-PT, Laptop-PT, TabletPC-PT, SMARTPHONE-PT, Printer-PT), cloud (Cloud-PT), access points (AccessPoint-PT, AccessPoint-PT-N, AccessPoint-PT-AC, LAP-PT), hub (Hub-PT), firewalls (5505, 5506-X), WLC (WLC-PT, WLC-2504, WLC-3504), modems (DSL-Modem-PT, Cable-Modem-PT). **No router has serial ports by default** — serial requires HWIC/NIM modules. Module catalog in `modules.py` (13 modules: HWIC-2T, NIM-2T, etc.).
 
 ## MCP Tools (22)
 

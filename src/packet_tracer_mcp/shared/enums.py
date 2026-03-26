@@ -31,6 +31,10 @@ class DeviceCategory(str, Enum):
     LAPTOP = "laptop"
     CLOUD = "cloud"
     ACCESS_POINT = "accesspoint"
+    HUB = "hub"
+    FIREWALL = "firewall"
+    WLC = "wlc"
+    MODEM = "modem"
 
 
 class DeviceRole(str, Enum):
@@ -51,6 +55,9 @@ class CableType(str, Enum):
     SERIAL = "serial"
     FIBER = "fiber"
     CONSOLE = "console"
+    PHONE = "phone"
+    COAXIAL = "coaxial"
+    AUTO = "auto"
 
 
 class PortSpeed(str, Enum):

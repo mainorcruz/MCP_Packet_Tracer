@@ -27,6 +27,13 @@ class LinkPlan(BaseModel):
     cable: str = "straight"
 
 
+class ModulePlan(BaseModel):
+    """Un módulo de expansión a instalar en un dispositivo."""
+    device: str
+    slot: int
+    module: str  # e.g. "HWIC-2T", "NIM-2T"
+
+
 class DHCPPool(BaseModel):
     """Un pool DHCP en un router."""
     router: str
@@ -84,6 +91,7 @@ class TopologyPlan(BaseModel):
     """Plan completo, validado, listo para generar scripts."""
     name: str = "topology"
     devices: list[DevicePlan] = Field(default_factory=list)
+    modules: list[ModulePlan] = Field(default_factory=list)
     links: list[LinkPlan] = Field(default_factory=list)
     dhcp_pools: list[DHCPPool] = Field(default_factory=list)
     static_routes: list[StaticRoute] = Field(default_factory=list)
