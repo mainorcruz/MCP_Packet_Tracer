@@ -4,6 +4,8 @@
 
 **Python 3.11+ · Pydantic 2.0+ · FastMCP · Streamable HTTP · v0.4.0**
 
+[![MCP Badge](https://lobehub.com/badge/mcp/mats2208-mcp-packet-tracer)](https://lobehub.com/mcp/mats2208-mcp-packet-tracer)
+
 ---
 
 ## Preview
