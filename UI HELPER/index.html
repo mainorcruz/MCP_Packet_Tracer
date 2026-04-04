@@ -229,7 +229,8 @@
             border-radius: 2px 2px 0 0;
         }
 
-        .tab-icon { font-size: 12px; }
+        .tab-icon { font-size: 12px; display: inline-flex; align-items: center; }
+        .tab-icon svg, .btn svg, .notif-strip svg { vertical-align: -1px; flex-shrink: 0; }
 
         .tab-badge {
             background: var(--red);
@@ -926,38 +927,38 @@
 
     <!-- NOTIFICATION STRIP -->
     <div class="notif-strip" id="notifStrip">
-        <span>⚠</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
         <span id="notifMsg"></span>
-        <span class="notif-close" onclick="closeNotif()">✕</span>
+        <span class="notif-close" onclick="closeNotif()"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span>
     </div>
 
     <!-- TAB NAV -->
     <div class="tab-nav">
         <button class="tab-btn active" id="tab-editor" onclick="switchTab('editor')">
-            <span class="tab-icon">✏️</span> Editor
+            <span class="tab-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5z"/></svg></span> Editor
         </button>
         <button class="tab-btn" id="tab-terminal" onclick="switchTab('terminal')">
-            <span class="tab-icon">📟</span> Terminal
+            <span class="tab-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></span> Terminal
             <span class="tab-badge" id="errBadge">0</span>
         </button>
         <button class="tab-btn" id="tab-status" onclick="switchTab('status')">
-            <span class="tab-icon">📊</span> Status
+            <span class="tab-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span> Status
         </button>
         <button class="tab-btn" id="tab-quickbuild" onclick="switchTab('quickbuild')">
-            <span class="tab-icon">⚡</span> Quick Build
+            <span class="tab-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span> Quick Build
         </button>
     </div>
 
     <!-- EDITOR TOOLBAR -->
     <div class="toolbar" id="editor-toolbar">
-        <button class="btn btn-run" onclick="executeCode()" title="Run (Ctrl+Enter)">▶ Run</button>
+        <button class="btn btn-run" onclick="executeCode()" title="Run (Ctrl+Enter)"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21"/></svg> Run</button>
         <div class="toolbar-sep"></div>
-        <button class="btn btn-ghost" onclick="pasteFromClipboard()">⬇ Paste</button>
-        <button class="btn btn-ghost" onclick="copyToClipboard()">⬆ Copy</button>
+        <button class="btn btn-ghost" onclick="pasteFromClipboard()"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><line x1="12" y1="11" x2="12" y2="17"/><polyline points="9 14 12 17 15 14"/></svg> Paste</button>
+        <button class="btn btn-ghost" onclick="copyToClipboard()"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> Copy</button>
         <div class="toolbar-sep"></div>
-        <button class="btn btn-danger" onclick="clearEditor()">✕ Clear</button>
+        <button class="btn btn-danger" onclick="clearEditor()"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Clear</button>
         <div class="toolbar-spacer"></div>
-        <button class="btn btn-warn" onclick="clearLog()" title="Clear log">🗑 Clear Log</button>
+        <button class="btn btn-warn" onclick="clearLog()" title="Clear log"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg> Clear Log</button>
     </div>
 
     <!-- PANES -->
@@ -980,13 +981,19 @@
                     </span>
                 </div>
                 <textarea id="codeeditor"
-                    placeholder="// Enter PTBuilder commands here...
-// Examples:
-//   addDevice('R1', '2911', 200, 200)
-//   addDevice('PC1', 'PC-PT', 400, 200)
-//   addLink('R1', 'GigabitEthernet0/0', 'PC1', 'FastEthernet0')
+                    placeholder="// PT Script Engine commands — one per line
+// Devices:
+//   addDevice(&quot;R1&quot;, &quot;2911&quot;, 200, 200);
+//   addDevice(&quot;SW1&quot;, &quot;2960-24TT&quot;, 200, 350);
+//   addDevice(&quot;PC1&quot;, &quot;PC-PT&quot;, 200, 500);
+// Links (5 params — cable: &quot;cross&quot; or &quot;straight&quot;):
+//   addLink(&quot;R1&quot;, &quot;GigabitEthernet0/0&quot;, &quot;SW1&quot;, &quot;GigabitEthernet0/1&quot;, &quot;straight&quot;);
+// Config:
+//   configureIosDevice(&quot;R1&quot;, &quot;enable\nconfigure terminal\nhostname R1\nend&quot;);
+//   configurePcIp(&quot;PC1&quot;, true);
 //
-// Use Quick Build tab to generate a full topology automatically."
+// Models: 2911, 2901, 1941, ISR4321 (routers) | 2960-24TT, 3560-24PS (switches)
+//         PC-PT, Server-PT, Laptop-PT (end devices)"
                     oninput="onEditorInput()"
                     onkeydown="editorKeyDown(event)"></textarea>
             </div>
@@ -1000,10 +1007,10 @@
                 <button class="filter-btn f-cmd" id="f-cmd" onclick="setFilter('cmd')">Commands</button>
                 <button class="filter-btn f-recv" id="f-recv" onclick="setFilter('recv')">Received</button>
                 <div class="toolbar-sep"></div>
-                <input class="log-search" id="logSearch" type="text" placeholder="🔍 Search logs…" oninput="renderLog()">
+                <input class="log-search" id="logSearch" type="text" placeholder="Search logs…" oninput="renderLog()">
                 <div class="toolbar-sep"></div>
-                <button class="btn btn-ghost" onclick="exportLogs()" style="font-size:10.5px;padding:2px 7px;">⬆ Export</button>
-                <button class="btn btn-warn" onclick="clearLog()" style="font-size:10.5px;padding:2px 7px;">🗑 Clear</button>
+                <button class="btn btn-ghost" onclick="exportLogs()" style="font-size:10.5px;padding:2px 7px;"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg> Export</button>
+                <button class="btn btn-warn" onclick="clearLog()" style="font-size:10.5px;padding:2px 7px;"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg> Clear</button>
                 <span class="log-count" id="logCount">0 entries</span>
             </div>
             <div id="logPanel"></div>
@@ -1060,7 +1067,7 @@
                     </p>
                     <div class="snippet-wrap">
                         <div class="snippet-code" id="bootstrapSnippet"></div>
-                        <button class="btn btn-accent snippet-copy-btn" onclick="copyBootstrap()">📋 Copy to Clipboard</button>
+                        <button class="btn btn-accent snippet-copy-btn" onclick="copyBootstrap()"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg> Copy to Clipboard</button>
                     </div>
                 </div>
             </div>
@@ -1169,7 +1176,7 @@
                     <div class="section-title">Action</div>
                     <div class="qb-actions">
                         <div class="qb-preview" id="qbPreview">—</div>
-                        <button class="btn btn-build" onclick="quickBuild()">⚡ Build & Deploy</button>
+                        <button class="btn btn-build" onclick="quickBuild()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Build & Deploy</button>
                     </div>
                     <div style="margin-top:8px;font-size:10.5px;color:var(--text-muted);line-height:1.5">
                         Sends the complete topology script to Packet Tracer via the live bridge.
