@@ -31,7 +31,7 @@ from ...infrastructure.execution.deploy_executor import DeployExecutor
 from ...infrastructure.execution.live_bridge import PTCommandBridge
 from ...infrastructure.execution.live_executor import LiveExecutor
 from ...infrastructure.persistence.project_repository import ProjectRepository
-from ...infrastructure.catalog.devices import ALL_MODELS
+from ...infrastructure.catalog.devices import ALL_MODELS, resolve_model
 from ...infrastructure.catalog.cables import CABLE_TYPES
 from ...infrastructure.catalog.aliases import MODEL_ALIASES
 from ...infrastructure.catalog.templates import list_templates
@@ -84,10 +84,13 @@ def register_tools(mcp: FastMCP) -> None:
         """
         Muestra detalles de un modelo de dispositivo específico.
 
+        Acepta tanto el nombre exacto del modelo (ej: '2911', '2960-24TT')
+        como un alias del catálogo (ej: 'router', 'switch', 'firewall').
+
         Parámetros:
-        - model_name: nombre del modelo (ej: '2911', '2960', 'PC')
+        - model_name: nombre del modelo o alias
         """
-        model = ALL_MODELS.get(model_name)
+        model = resolve_model(model_name)
         if not model:
             return f"Modelo '{model_name}' no encontrado. Usa pt_list_devices para ver modelos."
         info = {
@@ -221,6 +224,31 @@ def register_tools(mcp: FastMCP) -> None:
         Parámetros:
         - plan_json: JSON del plan (output de pt_plan_topology)
         """
+        try:
+            raw = json.loads(plan_json)
+        except json.JSONDecodeError as exc:
+            return json.dumps({
+                "valid": False,
+                "error_count": 1,
+                "warning_count": 0,
+                "errors": [{"code": "INVALID_JSON", "message": f"JSON inválido: {exc.msg}"}],
+                "warnings": [],
+                "summary": "❌ JSON inválido — no se pudo parsear el plan.",
+            }, indent=2, ensure_ascii=False)
+
+        if not isinstance(raw, dict) or "devices" not in raw or not raw.get("devices"):
+            return json.dumps({
+                "valid": False,
+                "error_count": 1,
+                "warning_count": 0,
+                "errors": [{
+                    "code": "EMPTY_PLAN",
+                    "message": "El JSON no contiene un plan válido (falta 'devices' o está vacío). Genera el plan con pt_plan_topology primero.",
+                }],
+                "warnings": [],
+                "summary": "❌ Plan vacío o sin estructura — debe incluir al menos un dispositivo.",
+            }, indent=2, ensure_ascii=False)
+
         plan = TopologyPlan.model_validate_json(plan_json)
         result = validate_plan(plan)
 
@@ -686,8 +714,13 @@ def register_tools(mcp: FastMCP) -> None:
 
         Parámetros:
         - plan_json: JSON del plan (output de pt_plan_topology o pt_full_build)
-        - command_delay: retardo entre comandos en segundos (default 1.0)
+        - command_delay: retardo entre comandos en segundos (default 1.0).
+          Valores menores a 1.0 pueden disparar popups de error en PT porque
+          configureIosDevice/configurePcIp se ejecutan antes de que el dispositivo
+          termine de inicializarse. El valor recibido se clampa a un mínimo de 1.0.
         """
+        if command_delay < 1.0:
+            command_delay = 1.0
         if not _ensure_bridge():
             return (
                 "No se pudo iniciar el bridge HTTP en :54321.\n"
@@ -816,10 +849,17 @@ def register_tools(mcp: FastMCP) -> None:
         }
         lines = [f"Dispositivos en Packet Tracer ({data.get('count', len(devices))}):", ""]
         for d in devices:
-            tname = d.get("typeName") or type_labels.get(d.get("type"), f"type={d.get('type')}")
-            model = f" [{d['model']}]" if d.get("model") else ""
+            type_name = d.get("typeName")
+            model_name = d.get("model")
+            if not type_name or type_name.lower() == "unknown":
+                catalog_model = resolve_model(model_name) if model_name else None
+                if catalog_model:
+                    type_name = catalog_model.category
+                else:
+                    type_name = type_labels.get(d.get("type"), f"type={d.get('type')}")
+            model = f" [{model_name}]" if model_name else ""
             pos = f"  pos=({d['x']},{d['y']})" if d.get("x") is not None else ""
-            lines.append(f"  {d['name']:15}  {tname}{model}{pos}")
+            lines.append(f"  {d['name']:15}  {type_name}{model}{pos}")
         return "\n".join(lines)
 
     @mcp.tool()
