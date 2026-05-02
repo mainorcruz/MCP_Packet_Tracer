@@ -17,10 +17,10 @@
 
 <table>
 <tr>
-<td align="center"><strong>26 MCP Tools</strong></td>
+<td align="center"><strong>27 MCP Tools</strong></td>
 <td align="center"><strong>5 MCP Resources</strong></td>
 <td align="center"><strong>74 Device Models</strong></td>
-<td align="center"><strong>150 Modules</strong></td>
+<td align="center"><strong>151 Modules</strong></td>
 <td align="center"><strong>15 Cable Types</strong></td>
 </tr>
 </table>
@@ -83,12 +83,12 @@
 - [Installation](#-installation)
 - [Quick Start](#-quick-start)
 - [How It Works](#-how-it-works)
-- [MCP Tools (22)](#-mcp-tools)
+- [MCP Tools (27)](#-mcp-tools)
 - [MCP Resources (5)](#-mcp-resources)
 - [Live Deploy Setup](#-live-deploy-setup)
 - [Supported Devices (74)](#-supported-devices)
 - [Cable Types (15)](#-cable-types)
-- [Expansion Modules (150)](#-expansion-modules)
+- [Expansion Modules (151)](#-expansion-modules)
 - [IP Addressing](#-ip-addressing)
 - [Routing Protocols](#-routing-protocols)
 - [Topology Templates](#-topology-templates)
@@ -100,7 +100,7 @@
 
 ## ◈ What It Does
 
-A **Model Context Protocol (MCP) server** that gives any LLM (GitHub Copilot, Claude, Codex, etc.) full programmatic control over Cisco Packet Tracer. 26 MCP tools and 5 MCP resources cover the complete workflow:
+A **Model Context Protocol (MCP) server** that gives any LLM (GitHub Copilot, Claude, Codex, etc.) full programmatic control over Cisco Packet Tracer. 27 MCP tools and 5 MCP resources cover the complete workflow:
 
 ```
 Natural language prompt
@@ -130,7 +130,7 @@ Natural language prompt
 | **NAT / PAT** | Static NAT, dynamic NAT, PAT overload | Translate addresses on live routers via bridge |
 | **Deploy** | Real-time HTTP bridge to Packet Tracer | No copy-paste — commands stream directly |
 | **Export** | Plans, JS scripts, CLI configs to disk | Reusable project files |
-| **Catalog** | 74 devices · 150 modules · 15 cables | 34 categories, 101 aliases |
+| **Catalog** | 74 devices · 151 modules · 15 cables | 34 categories, 101 aliases |
 
 ---
 
@@ -356,7 +356,7 @@ Port 39000 was chosen to avoid collisions with common ports (3000, 5000, 8000, 8
 
 ## ◈ MCP Tools
 
-26 tools across 9 groups.
+27 tools across 9 groups.
 
 ### Catalog
 
@@ -774,7 +774,7 @@ The server infers the correct cable automatically from the two device categories
 
 ## ◈ Expansion Modules
 
-150 expansion modules across 26 module categories. They add extra ports to devices at runtime. The generator emits `addModule()` calls **after** `addDevice()` and **before** `addLink()`, which is the required PTBuilder execution order.
+151 expansion modules across 26 module categories. They add extra ports to devices at runtime. The generator emits `addModule()` calls **after** `addDevice()` and **before** `addLink()`, which is the required PTBuilder execution order.
 
 ```javascript
 addDevice("R1", "2911", 100, 100);
@@ -823,7 +823,7 @@ addLink("R1", "Serial0/0/0", "R2", "Serial0/0/0", "serial");
 
 #### Other Module Families
 
-The catalog contains 150 modules total across all device types:
+The catalog contains 151 modules total across all device types:
 
 | Module Family | Count | Applies To |
 |---------------|-------|------------|
@@ -928,7 +928,7 @@ Templates are hints that guide the orchestrator's topology-building logic.
 src/packet_tracer_mcp/
 ├── adapters/
 │   └── mcp/
-│       ├── tool_registry.py       # All 26 MCP tools (@mcp.tool decorators)
+│       ├── tool_registry.py       # All 27 MCP tools (@mcp.tool decorators)
 │       └── resource_registry.py   # All 5 MCP resources (@mcp.resource decorators)
 │
 ├── application/
@@ -959,7 +959,7 @@ src/packet_tracer_mcp/
 ├── infrastructure/
 │   ├── catalog/
 │   │   ├── devices.py             # 74 DeviceModel definitions across 34 categories
-│   │   ├── modules.py             # 150 expansion module specs (NM, HWIC, NIM, WIC, SFP...)
+│   │   ├── modules.py             # 151 expansion module specs (NM, HWIC, NIM, WIC, SFP...)
 │   │   ├── cables.py              # 15 cable types, PT codes, 88 inference rules
 │   │   ├── aliases.py             # 101 model name aliases
 │   │   └── templates.py           # 9 topology template definitions
