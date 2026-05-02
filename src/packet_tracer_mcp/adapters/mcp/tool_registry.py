@@ -12,11 +12,17 @@ from mcp.server.fastmcp import FastMCP
 
 from ...domain.models.plans import TopologyPlan
 from ...domain.models.requests import TopologyRequest
+from ...domain.models.acls import ACLPlan, ACLBinding, ACLEntry
 from ...domain.services.orchestrator import plan_from_request
 from ...domain.services.validator import validate_plan
 from ...domain.services.auto_fixer import fix_plan
 from ...domain.services.explainer import explain_plan
 from ...domain.services.estimator import estimate_from_request, estimate_from_plan
+from ...application.use_cases.apply_acl import (
+    build_acl_plan,
+    apply_acl_uc,
+    remove_acl_uc,
+)
 from ...infrastructure.generator.ptbuilder_generator import (
     generate_ptbuilder_script,
     generate_full_script,
@@ -645,8 +651,46 @@ def register_tools(mcp: FastMCP) -> None:
         'x.send()},500)");'
     )
 
+    # Runtime patches que sobrescriben las funciones nativas del PT script engine
+    # con versiones que tienen guards defensivos. Sin estos, llamar configureIosDevice
+    # o addModule en hosts (PC/Server/Laptop) tira TypeError → popup → mata el bootstrap.
+    # Se inyectan automáticamente al detectar PT recién conectado (idempotente).
+    # Importante: usar this.xxx (no asignación libre) porque las funciones son nativas
+    # y solo se sobrescriben vía binding global. Todo en una sola línea — el script
+    # engine de PT strippea los \n del código fuente JS.
+    _RUNTIME_PATCHES_JS = (
+        'this.addModule = function(deviceName, slot, model) { '
+        'var device = ipc.network().getDevice(deviceName); if (!device) { return false; } '
+        'var hasPower = typeof device.getPower === "function" && typeof device.setPower === "function"; '
+        'var powerState = false; '
+        'if (hasPower) { powerState = device.getPower(); device.setPower(false); } '
+        'var moduleType = allModuleTypes[model]; '
+        'var result = device.addModule(slot, moduleType, model); '
+        'if (hasPower && powerState) { device.setPower(true); '
+        'if (typeof device.skipBoot === "function") { device.skipBoot(); } } '
+        'if (result != true) { return false; } return true; }; '
+        'this.configurePcIp = function(deviceName, dhcpEnabled, ipaddress, subnetMask, defaultGateway, dnsServer) { '
+        'var device = ipc.network().getDevice(deviceName); if (!device) { return; } '
+        'var port = device.getPort("FastEthernet0"); if (!port) { return; } '
+        'if (dhcpEnabled === true || dhcpEnabled === false) { '
+        'if (typeof device.setDhcpFlag === "function") { device.setDhcpFlag(dhcpEnabled); } } '
+        'if (ipaddress && subnetMask) port.setIpSubnetMask(ipaddress, subnetMask); '
+        'if (defaultGateway) port.setDefaultGateway(defaultGateway); '
+        'if (dnsServer) port.setDnsServerIp(dnsServer); }; '
+        'this.configureIosDevice = function(deviceName, commands) { '
+        'var device = ipc.network().getDevice(deviceName); if (!device) { return false; } '
+        'if (typeof device.skipBoot !== "function" || typeof device.enterCommand !== "function") { return false; } '
+        'device.skipBoot(); var commandsArray = commands.split("\\n"); '
+        'device.enterCommand("!", "global"); '
+        'for (var i = 0; i < commandsArray.length; i++) { device.enterCommand(commandsArray[i], ""); } '
+        'device.enterCommand("write memory", "enable"); return true; };'
+    )
+
     # Singleton bridge interno — se inicia automáticamente dentro del proceso MCP
     _bridge_instance: PTCommandBridge | None = None
+    # Flag idempotente — true si los runtime patches ya se enviaron a esta sesión PT.
+    # Se resetea cuando PT se desconecta para reaplicar al reconectar.
+    _patches_applied: list[bool] = [False]  # list para mutación en closures
 
     def _http_get(url: str, timeout: float = 2.0):
         try:
@@ -673,10 +717,29 @@ def register_tools(mcp: FastMCP) -> None:
         status, body = _http_get(f"{_BRIDGE_URL}/status", timeout=1.0)
         if status == 200 and body:
             try:
-                return json.loads(body).get("connected", False)
+                connected = json.loads(body).get("connected", False)
+                if not connected:
+                    # PT se desconectó — resetear flag para reaplicar patches al reconectar
+                    _patches_applied[0] = False
+                return connected
             except Exception:
                 pass
         return False
+
+    def _ensure_pt_patches() -> None:
+        """Inyecta los runtime patches en PT si aún no se aplicaron en esta conexión.
+
+        Idempotente — el flag _patches_applied evita reenvíos en cada operación.
+        Se resetea automáticamente cuando _bridge_pt_connected detecta desconexión.
+        """
+        if _patches_applied[0]:
+            return
+        if not _bridge_is_up():
+            return
+        # Encolar los patches en el bridge. PT los ejecuta en su próximo poll.
+        status, _ = _http_post(f"{_BRIDGE_URL}/queue", _RUNTIME_PATCHES_JS)
+        if status == 200:
+            _patches_applied[0] = True
 
     def _ensure_bridge() -> bool:
         """
@@ -738,6 +801,10 @@ def register_tools(mcp: FastMCP) -> None:
                 "El bootstrap inyecta un polling loop en el webview (QWebEngine) "
                 "que SI tiene XMLHttpRequest."
             )
+
+        # Asegurar que los runtime patches estén aplicados antes de cualquier deploy.
+        # Esto evita que configurePcIp/configureIosDevice/addModule en hosts maten el bootstrap.
+        _ensure_pt_patches()
 
         plan = TopologyPlan.model_validate_json(plan_json)
         script = generate_executable_script(plan)
@@ -806,7 +873,11 @@ def register_tools(mcp: FastMCP) -> None:
         return None
 
     def _check_bridge() -> str | None:
-        """Check bridge+PT connectivity. Returns error message or None if OK."""
+        """Check bridge+PT connectivity. Returns error message or None if OK.
+
+        Si PT está conectado, también garantiza que los runtime patches estén
+        aplicados (idempotente — solo envía la primera vez por conexión).
+        """
         if not _ensure_bridge():
             return "No se pudo iniciar el bridge en :54321."
         if not _bridge_pt_connected():
@@ -814,6 +885,7 @@ def register_tools(mcp: FastMCP) -> None:
                 "Bridge activo pero PT no está conectado.\n"
                 "Ejecuta el bootstrap en Builder Code Editor."
             )
+        _ensure_pt_patches()
         return None
 
     # ------------------------------------------------------------------
@@ -1002,3 +1074,193 @@ def register_tools(mcp: FastMCP) -> None:
             if status == 200:
                 return "Comando enviado a PT."
             return "Error al enviar comando al bridge."
+
+    # ------------------------------------------------------------------
+    # ACL — aplicar y eliminar Access Control Lists vía bridge
+    # ------------------------------------------------------------------
+
+    def _query_pt_devices() -> list[dict]:
+        """Helper: consulta topología activa de PT y devuelve lista de devices."""
+        result = _bridge_send_and_wait("queryTopology()", timeout=10.0)
+        if result is None:
+            return []
+        try:
+            data = json.loads(result)
+            return data.get("devices", []) or []
+        except Exception:
+            return []
+
+    def _bridge_send_payload(js_call: str) -> bool:
+        """Helper: envía un JS payload al bridge (fire-and-forget)."""
+        status, _ = _http_post(f"{_BRIDGE_URL}/queue", js_call)
+        return status == 200
+
+    @mcp.tool()
+    def pt_apply_acl(
+        router: str,
+        name_or_number: str,
+        acl_type: str,
+        entries: list[dict],
+        binding_interface: str = "",
+        binding_direction: str = "in",
+        dry_run: bool = False,
+    ) -> str:
+        """
+        Aplica una Access Control List (ACL) a un router en la topología activa de PT.
+
+        Pipeline: construye plan → valida estática (rangos, tipos, IPs/wildcards,
+        reglas inalcanzables) → verifica router/interfaz contra PT vía bridge →
+        genera CLI IOS → envía vía configureIosDevice.
+
+        Parámetros:
+        - router: nombre del dispositivo en PT (ej: "CORE-R1"). Llama a
+          pt_query_topology si no estás seguro de los nombres exactos.
+        - name_or_number: identificador IOS de la ACL.
+            * 1-99 o 1300-1999 → standard
+            * 100-199 o 2000-2699 → extended
+            * cualquier string alfanumérico → named ACL
+        - acl_type: "standard" o "extended". Standard solo filtra por source.
+          Extended permite source + destination + protocolo + puertos.
+        - entries: lista de reglas. Cada regla es un dict con:
+            * action: "permit" | "deny" (requerido)
+            * protocol: "ip" | "icmp" | "tcp" | "udp" | ... (default "ip")
+            * source: "any" | "host A.B.C.D" | "A.B.C.D wildcard" (requerido)
+            * destination: igual que source (solo extended)
+            * source_port_op / source_port: ej "eq" / 80 (TCP/UDP, opcional)
+            * dest_port_op / dest_port / dest_port_end: igual (opcional)
+            * icmp_type: "echo" | "echo-reply" | ... (solo ICMP)
+            * tcp_flags: ["established"] | ["syn"] (solo TCP, opcional)
+            * log: bool (opcional)
+            * remark: comentario opcional
+        - binding_interface: si se especifica, aplica la ACL a esa interfaz
+          (ej: "GigabitEthernet0/0"). Si vacío, solo se define la ACL sin aplicar.
+        - binding_direction: "in" o "out" (default "in"). Solo aplica si
+          binding_interface está definido.
+        - dry_run: si True, NO envía nada al bridge — solo valida y devuelve
+          el CLI/JS payload para inspección.
+
+        Ejemplo: bloquear ping de 192.168.1.0/24 a 192.168.0.0/24 en CORE-R1:
+          pt_apply_acl(
+              router="CORE-R1",
+              name_or_number="101",
+              acl_type="extended",
+              entries=[
+                  {"action": "deny", "protocol": "icmp",
+                   "source": "192.168.1.0 0.0.0.255",
+                   "destination": "192.168.0.0 0.0.0.255",
+                   "icmp_type": "echo"},
+                  {"action": "permit", "protocol": "ip",
+                   "source": "any", "destination": "any"},
+              ],
+              binding_interface="GigabitEthernet0/0",
+              binding_direction="in",
+          )
+        """
+        plan = build_acl_plan(router, name_or_number, acl_type, entries)
+        binding = None
+        if binding_interface:
+            binding = ACLBinding(
+                router=router,
+                interface=binding_interface,
+                acl_id=str(name_or_number),
+                direction=binding_direction,
+            )
+
+        # Solo consulta PT si el bridge está conectado (validación dinámica)
+        bridge_ok = _ensure_bridge() and _bridge_pt_connected()
+        if bridge_ok:
+            _ensure_pt_patches()
+        query_fn = _query_pt_devices if bridge_ok else None
+        send_fn = _bridge_send_payload if bridge_ok and not dry_run else None
+
+        result = apply_acl_uc(
+            plan=plan,
+            binding=binding,
+            query_pt_topology=query_fn,
+            bridge_send=send_fn,
+            dry_run=dry_run,
+        )
+
+        # Resumen amigable
+        summary_lines = []
+        if result["valid"]:
+            summary_lines.append(f"✅ ACL '{plan.name_or_number}' válida ({len(plan.entries)} reglas).")
+        else:
+            summary_lines.append(f"❌ ACL '{plan.name_or_number}' tiene {len(result['errors'])} error(es).")
+
+        if dry_run:
+            summary_lines.append("Modo dry_run — NO se envió al bridge.")
+        elif result["sent"]:
+            summary_lines.append(f"📤 Aplicada en '{router}' vía bridge (configureIosDevice).")
+            if binding:
+                summary_lines.append(f"   Binding: {binding.interface} {binding.direction}")
+        elif result["valid"] and not bridge_ok:
+            summary_lines.append("⚠ Bridge no conectado — payload generado pero NO enviado.")
+        elif result["valid"] and not result["sent"]:
+            summary_lines.append("⚠ Bridge OK pero envío falló.")
+
+        return json.dumps({
+            "summary": "\n".join(summary_lines),
+            "valid": result["valid"],
+            "errors": result["errors"],
+            "warnings": result["warnings"],
+            "cli_lines": result["cli_lines"],
+            "js_payload": result["js_payload"],
+            "sent": result["sent"],
+            "dry_run": result["dry_run"],
+        }, indent=2, ensure_ascii=False)
+
+    @mcp.tool()
+    def pt_remove_acl(
+        router: str,
+        name_or_number: str,
+        binding_interface: str = "",
+        binding_direction: str = "in",
+        dry_run: bool = False,
+    ) -> str:
+        """
+        Elimina una ACL aplicada en un router.
+
+        Si binding_interface se especifica, primero quita el binding de la
+        interfaz (no ip access-group ...) y luego elimina la ACL completa
+        (no access-list ...).
+
+        Parámetros:
+        - router: nombre del dispositivo en PT
+        - name_or_number: identificador de la ACL a eliminar
+        - binding_interface: opcional, interfaz donde estaba aplicada
+        - binding_direction: "in" o "out" (solo si binding_interface)
+        - dry_run: si True, devuelve payload sin enviarlo
+        """
+        bridge_ok = _ensure_bridge() and _bridge_pt_connected()
+        if bridge_ok:
+            _ensure_pt_patches()
+        send_fn = _bridge_send_payload if bridge_ok and not dry_run else None
+
+        result = remove_acl_uc(
+            router=router,
+            name_or_number=name_or_number,
+            binding_interface=binding_interface,
+            direction=binding_direction,
+            bridge_send=send_fn,
+            dry_run=dry_run,
+        )
+
+        summary = []
+        if dry_run:
+            summary.append(f"Modo dry_run — payload generado para eliminar ACL '{name_or_number}' en '{router}'.")
+        elif result["sent"]:
+            summary.append(f"📤 ACL '{name_or_number}' eliminada en '{router}' vía bridge.")
+        elif not bridge_ok:
+            summary.append("⚠ Bridge no conectado — payload generado pero NO enviado.")
+        else:
+            summary.append("⚠ Envío falló.")
+
+        return json.dumps({
+            "summary": "\n".join(summary),
+            "router": result["router"],
+            "acl_id": result["acl_id"],
+            "js_payload": result["js_payload"],
+            "sent": result["sent"],
+            "dry_run": result["dry_run"],
+        }, indent=2, ensure_ascii=False)
