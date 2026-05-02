@@ -17,7 +17,7 @@
 
 <table>
 <tr>
-<td align="center"><strong>22 MCP Tools</strong></td>
+<td align="center"><strong>26 MCP Tools</strong></td>
 <td align="center"><strong>5 MCP Resources</strong></td>
 <td align="center"><strong>74 Device Models</strong></td>
 <td align="center"><strong>150 Modules</strong></td>
@@ -100,7 +100,7 @@
 
 ## ◈ What It Does
 
-A **Model Context Protocol (MCP) server** that gives any LLM (GitHub Copilot, Claude, Codex, etc.) full programmatic control over Cisco Packet Tracer. 22 MCP tools and 5 MCP resources cover the complete workflow:
+A **Model Context Protocol (MCP) server** that gives any LLM (GitHub Copilot, Claude, Codex, etc.) full programmatic control over Cisco Packet Tracer. 26 MCP tools and 5 MCP resources cover the complete workflow:
 
 ```
 Natural language prompt
@@ -125,7 +125,9 @@ Natural language prompt
 | **IP Addressing** | Automatic /24 LANs + /30 WAN links | Sequential assignment, gateway at `.1` |
 | **DHCP** | Auto pool generation | One pool per LAN, gateway excluded |
 | **Routing** | Static / OSPF / EIGRP / RIP | Full IOS command generation |
-| **Validation** | 15 typed error codes + auto-fixer | Wrong cables, missing ports, model upgrades |
+| **Validation** | 24 typed error codes + auto-fixer | Wrong cables, missing ports, model upgrades |
+| **ACL** | Standard, extended and named ACLs | Apply, bind and remove ACLs on live routers |
+| **NAT / PAT** | Static NAT, dynamic NAT, PAT overload | Translate addresses on live routers via bridge |
 | **Deploy** | Real-time HTTP bridge to Packet Tracer | No copy-paste — commands stream directly |
 | **Export** | Plans, JS scripts, CLI configs to disk | Reusable project files |
 | **Catalog** | 74 devices · 150 modules · 15 cables | 34 categories, 101 aliases |
@@ -354,7 +356,7 @@ Port 39000 was chosen to avoid collisions with common ports (3000, 5000, 8000, 8
 
 ## ◈ MCP Tools
 
-22 tools across 7 groups.
+26 tools across 9 groups.
 
 ### Catalog
 
@@ -382,7 +384,7 @@ Port 39000 was chosen to avoid collisions with common ports (3000, 5000, 8000, 8
 
 | Tool | Description |
 |------|-------------|
-| `pt_validate_plan` | Validates a plan against 15 typed error codes |
+| `pt_validate_plan` | Validates a plan against 24 typed error codes |
 | `pt_fix_plan` | Auto-corrects common errors (wrong cables, missing ports, model upgrades) |
 | `pt_explain_plan` | Returns a natural-language explanation of every decision in the plan |
 
@@ -427,6 +429,31 @@ Port 39000 was chosen to avoid collisions with common ports (3000, 5000, 8000, 8
 | `pt_export` | Exports plan, JS script and CLI configs to files |
 | `pt_list_projects` | Lists saved projects |
 | `pt_load_project` | Loads a previously saved project |
+
+### ACL
+
+Apply and remove Access Control Lists on live routers via the HTTP bridge. Works independently of `pt_live_deploy` — you can add ACLs to any existing topology.
+
+| Tool | Description |
+|------|-------------|
+| `pt_apply_acl` | Applies a standard, extended or named ACL to a router interface. Validates number ranges, wildcard masks, protocol/port coherence and unreachable rules before sending |
+| `pt_remove_acl` | Removes an ACL (and optionally its interface binding) from a router |
+
+> **When to use each type:** Standard ACL (1–99) — filter by source IP only. Extended ACL (100–199) — filter by source, destination, protocol and ports. Named ACL — any string identifier, easier to read and edit in IOS.
+
+### NAT / PAT
+
+Configure address translation on live routers via the HTTP bridge. Three modes map directly to the three IOS NAT variants taught in CCNA.
+
+| Tool | Description |
+|------|-------------|
+| `pt_apply_nat` | Applies Static NAT, Dynamic NAT or PAT (NAT Overload) to a router. Marks inside/outside interfaces, generates the ACL and pool inline, validates IPs and pool ranges |
+| `pt_remove_nat` | Removes NAT translation rules, pool and ACL from a router and unmarks its interfaces |
+
+> **When to use each mode:**
+> - `static` — one private IP always maps to the same public IP. Use for servers that must be reachable from the internet with a fixed address.
+> - `dynamic` — pool of public IPs assigned on demand. Use when you have more public IPs than PAT justifies but fewer than private hosts.
+> - `pat` — many private IPs share one public IP using port numbers. Use in virtually every home and enterprise network (`use_interface_overload=True` uses the WAN interface IP directly).
 
 ---
 
@@ -901,7 +928,7 @@ Templates are hints that guide the orchestrator's topology-building logic.
 src/packet_tracer_mcp/
 ├── adapters/
 │   └── mcp/
-│       ├── tool_registry.py       # All 22 MCP tools (@mcp.tool decorators)
+│       ├── tool_registry.py       # All 26 MCP tools (@mcp.tool decorators)
 │       └── resource_registry.py   # All 5 MCP resources (@mcp.resource decorators)
 │
 ├── application/
@@ -912,7 +939,9 @@ src/packet_tracer_mcp/
 │   ├── models/
 │   │   ├── requests.py            # TopologyRequest -- input from LLM
 │   │   ├── plans.py               # TopologyPlan, DevicePlan, LinkPlan, ModulePlan
-│   │   └── errors.py              # PlanError, ErrorCode (15 codes), ValidationResult
+│   │   ├── acls.py                # ACLPlan, ACLEntry, ACLBinding
+│   │   ├── nat.py                 # NATConfig, NATPool, NATStaticMapping (3 modes)
+│   │   └── errors.py              # PlanError, ErrorCode (24 codes), ValidationResult
 │   ├── services/
 │   │   ├── orchestrator.py        # Main pipeline: request -> TopologyPlan
 │   │   ├── ip_planner.py          # Assigns /24 LANs and /30 inter-router links
@@ -923,7 +952,9 @@ src/packet_tracer_mcp/
 │   └── rules/
 │       ├── device_rules.py        # Validates device models against catalog
 │       ├── cable_rules.py         # Validates cable types and port conflicts
-│       └── ip_rules.py            # Validates IP uniqueness and subnet conflicts
+│       ├── ip_rules.py            # Validates IP uniqueness and subnet conflicts
+│       ├── acl_rules.py           # Validates ACL entries, numbers, wildcards
+│       └── nat_rules.py           # Validates NAT IPs, pool ranges, interface coherence
 │
 ├── infrastructure/
 │   ├── catalog/
@@ -933,8 +964,10 @@ src/packet_tracer_mcp/
 │   │   ├── aliases.py             # 101 model name aliases
 │   │   └── templates.py           # 9 topology template definitions
 │   ├── generator/
-│   │   ├── ptbuilder_generator.py # Generates addDevice/addModule/addLink JS
-│   │   └── cli_config_generator.py # Generates IOS CLI blocks (DHCP, routing, ...)
+│   │   ├── ptbuilder_generator.py  # Generates addDevice/addModule/addLink JS
+│   │   ├── cli_config_generator.py # Generates IOS CLI blocks (DHCP, routing, ...)
+│   │   ├── acl_cli_generator.py    # Generates access-list / ip access-group CLI
+│   │   └── nat_cli_generator.py    # Generates ip nat inside/outside / pool / overload CLI
 │   ├── execution/
 │   │   ├── live_bridge.py         # PTCommandBridge HTTP server (:54321)
 │   │   ├── live_executor.py       # Converts TopologyPlan -> JS commands -> bridge
