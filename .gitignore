@@ -28,6 +28,7 @@ env/
 data/test_*
 tmp/
 
+CLAUDE.md
 # Project exports (runtime output, not source)
 projects/
 
