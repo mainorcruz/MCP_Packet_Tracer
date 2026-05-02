@@ -23,6 +23,11 @@ from ...application.use_cases.apply_acl import (
     apply_acl_uc,
     remove_acl_uc,
 )
+from ...application.use_cases.apply_nat import (
+    build_nat_config,
+    apply_nat_uc,
+    remove_nat_uc,
+)
 from ...infrastructure.generator.ptbuilder_generator import (
     generate_ptbuilder_script,
     generate_full_script,
@@ -1260,6 +1265,204 @@ def register_tools(mcp: FastMCP) -> None:
             "summary": "\n".join(summary),
             "router": result["router"],
             "acl_id": result["acl_id"],
+            "js_payload": result["js_payload"],
+            "sent": result["sent"],
+            "dry_run": result["dry_run"],
+        }, indent=2, ensure_ascii=False)
+
+    # ------------------------------------------------------------------
+    # NAT / PAT — aplicar y eliminar traducción de direcciones vía bridge
+    # ------------------------------------------------------------------
+
+    @mcp.tool()
+    def pt_apply_nat(
+        router: str,
+        mode: str,
+        inside_interface: str,
+        outside_interface: str,
+        static_mappings: list[dict] | None = None,
+        inside_networks: list[str] | None = None,
+        acl_number: str = "1",
+        pool_name: str = "NAT-POOL",
+        pool_start: str = "",
+        pool_end: str = "",
+        pool_netmask: str = "",
+        use_interface_overload: bool = False,
+        dry_run: bool = False,
+    ) -> str:
+        """
+        Aplica NAT o PAT a un router en la topología activa de Packet Tracer.
+
+        ── CUÁNDO USAR CADA MODO ──────────────────────────────────────────────
+
+        mode="static"  — NAT estático (1 a 1, permanente)
+          Cada IP privada se mapea SIEMPRE a la misma IP pública.
+          Usar cuando un servidor interno (web, FTP, correo) debe ser
+          alcanzable desde Internet con una IP pública fija conocida.
+          Requiere: static_mappings = [{"inside_local": "...", "inside_global": "..."}]
+
+        mode="dynamic" — NAT dinámico (pool de IPs públicas)
+          El router asigna IPs del pool bajo demanda. Cuando el host cierra
+          la sesión, la IP pública vuelve al pool para otro host.
+          Usar cuando tienes MÁS IPs públicas que overload justifica pero
+          MENOS que hosts internos simultáneos, y el tracking por IP importa.
+          Requiere: inside_networks + pool_start/end/netmask
+
+        mode="pat"     — PAT / NAT Overload (muchos a uno con puertos)
+          Múltiples hosts internos comparten UNA sola IP pública. El router
+          diferencia las conexiones usando números de puerto únicos.
+          Es el modo que usan casi todos los routers domésticos y empresariales.
+          Usar cuando tienes 1 IP pública del ISP y N hosts internos.
+          Sub-modos:
+            use_interface_overload=True  → usa la IP de outside_interface directamente
+            use_interface_overload=False → usa un pool (típicamente de 1 IP)
+          Requiere: inside_networks (+ pool si use_interface_overload=False)
+
+        ── PARÁMETROS ────────────────────────────────────────────────────────
+
+        - router: nombre del dispositivo en PT (ej: "R1"). Llama a
+          pt_query_topology si no conoces el nombre exacto.
+        - mode: "static" | "dynamic" | "pat"
+        - inside_interface: interfaz conectada a la LAN privada (ej: "GigabitEthernet0/0")
+        - outside_interface: interfaz conectada a la WAN/Internet (ej: "GigabitEthernet0/1")
+        - static_mappings: solo mode="static". Lista de dicts:
+            [{"inside_local": "192.168.1.10", "inside_global": "200.1.1.5"}]
+        - inside_networks: modos dynamic/pat. Redes internas a traducir en
+            formato "network wildcard" (ej: ["192.168.1.0 0.0.0.255"]).
+            Se generan como access-list inline.
+        - acl_number: número o nombre de ACL para identificar inside hosts (default "1")
+        - pool_name: nombre del pool NAT (default "NAT-POOL")
+        - pool_start / pool_end: primera y última IP del pool público
+        - pool_netmask: máscara del pool (formato máscara, ej: "255.255.255.0")
+        - use_interface_overload: solo PAT. Si True, usa la IP de outside_interface
+            en lugar de un pool. Tipico cuando el ISP asigna 1 IP a la WAN.
+        - dry_run: si True, valida y genera el payload sin enviarlo al bridge.
+
+        Ejemplo PAT con overload de interfaz (caso más común):
+          pt_apply_nat(
+              router="R1",
+              mode="pat",
+              inside_interface="GigabitEthernet0/0",
+              outside_interface="GigabitEthernet0/1",
+              inside_networks=["192.168.1.0 0.0.0.255"],
+              use_interface_overload=True,
+          )
+        """
+        config = build_nat_config(
+            router=router,
+            mode=mode,
+            inside_interface=inside_interface,
+            outside_interface=outside_interface,
+            static_mappings=static_mappings,
+            inside_networks=inside_networks,
+            acl_number=acl_number,
+            pool_name=pool_name,
+            pool_start=pool_start,
+            pool_end=pool_end,
+            pool_netmask=pool_netmask,
+            use_interface_overload=use_interface_overload,
+        )
+
+        bridge_ok = _ensure_bridge() and _bridge_pt_connected()
+        if bridge_ok:
+            _ensure_pt_patches()
+        query_fn = _query_pt_devices if bridge_ok else None
+        send_fn = _bridge_send_payload if bridge_ok and not dry_run else None
+
+        result = apply_nat_uc(
+            config=config,
+            query_pt_topology=query_fn,
+            bridge_send=send_fn,
+            dry_run=dry_run,
+        )
+
+        summary_lines = []
+        mode_label = {"static": "NAT Estático", "dynamic": "NAT Dinámico", "pat": "PAT/Overload"}.get(mode, mode)
+        if result["valid"]:
+            summary_lines.append(f"✅ {mode_label} válido para router '{router}'.")
+        else:
+            summary_lines.append(f"❌ {mode_label}: {len(result['errors'])} error(es).")
+
+        if dry_run:
+            summary_lines.append("Modo dry_run — NO se envió al bridge.")
+        elif result["sent"]:
+            summary_lines.append(f"📤 Aplicado en '{router}' vía bridge (configureIosDevice).")
+        elif result["valid"] and not bridge_ok:
+            summary_lines.append("⚠ Bridge no conectado — payload generado pero NO enviado.")
+        elif result["valid"] and not result["sent"]:
+            summary_lines.append("⚠ Bridge OK pero envío falló.")
+
+        return json.dumps({
+            "summary": "\n".join(summary_lines),
+            "mode": mode,
+            "valid": result["valid"],
+            "errors": result["errors"],
+            "warnings": result["warnings"],
+            "cli_lines": result["cli_lines"],
+            "js_payload": result["js_payload"],
+            "sent": result["sent"],
+            "dry_run": result["dry_run"],
+        }, indent=2, ensure_ascii=False)
+
+    @mcp.tool()
+    def pt_remove_nat(
+        router: str,
+        mode: str,
+        inside_interface: str,
+        outside_interface: str,
+        acl_number: str = "1",
+        pool_name: str = "",
+        static_mappings: list[dict] | None = None,
+        dry_run: bool = False,
+    ) -> str:
+        """
+        Elimina la configuración NAT/PAT de un router.
+
+        Quita las marcas ip nat inside/outside de las interfaces y elimina
+        las traducciones, pool y access-list asociados.
+
+        Parámetros:
+        - router: nombre del dispositivo en PT
+        - mode: "static" | "dynamic" | "pat"
+        - inside_interface: interfaz marcada como ip nat inside
+        - outside_interface: interfaz marcada como ip nat outside
+        - acl_number: número/nombre del access-list usado (default "1")
+        - pool_name: nombre del pool NAT a eliminar (solo dynamic/pat con pool)
+        - static_mappings: solo mode="static". Lista de dicts con inside_local/inside_global
+            para generar los comandos "no ip nat inside source static ..."
+        - dry_run: si True, devuelve payload sin enviarlo
+        """
+        bridge_ok = _ensure_bridge() and _bridge_pt_connected()
+        if bridge_ok:
+            _ensure_pt_patches()
+        send_fn = _bridge_send_payload if bridge_ok and not dry_run else None
+
+        result = remove_nat_uc(
+            router=router,
+            mode=mode,
+            inside_interface=inside_interface,
+            outside_interface=outside_interface,
+            acl_number=acl_number,
+            pool_name=pool_name,
+            static_mappings=static_mappings,
+            bridge_send=send_fn,
+            dry_run=dry_run,
+        )
+
+        summary = []
+        if dry_run:
+            summary.append(f"Modo dry_run — payload generado para eliminar NAT '{mode}' en '{router}'.")
+        elif result["sent"]:
+            summary.append(f"📤 NAT '{mode}' eliminado en '{router}' vía bridge.")
+        elif not bridge_ok:
+            summary.append("⚠ Bridge no conectado — payload generado pero NO enviado.")
+        else:
+            summary.append("⚠ Envío falló.")
+
+        return json.dumps({
+            "summary": "\n".join(summary),
+            "router": result["router"],
+            "mode": result["mode"],
             "js_payload": result["js_payload"],
             "sent": result["sent"],
             "dry_run": result["dry_run"],
