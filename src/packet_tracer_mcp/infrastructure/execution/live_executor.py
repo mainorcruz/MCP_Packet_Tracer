@@ -16,7 +16,7 @@ class LiveExecutor:
     def __init__(self, bridge):
         self._bridge = bridge
 
-    def execute(self, plan: TopologyPlan, delay: float = 1.0) -> dict:
+    def execute(self, plan: TopologyPlan, delay: float = 1.5) -> dict:
         """
         Send all topology commands to PT through the bridge.
 
